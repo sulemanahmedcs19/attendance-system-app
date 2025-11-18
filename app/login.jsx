@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -20,8 +19,19 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
 
+  // ✅ Check if token already exists and redirect to dashboard
+  useEffect(() => {
+    const checkToken = async () => {
+      const token = await AsyncStorage.getItem("token");
+      if (token) {
+        // If token exists, redirect to the home screen
+        router.replace("/(tabs)/home");
+      }
+    };
+    checkToken();
+  }, []);
+
   const handleLogin = async () => {
-    console.log("Login function");
     const now = new Date();
     const formattedTime = now.toLocaleTimeString([], {
       hour: "2-digit",
@@ -35,7 +45,6 @@ const Login = () => {
 
     if (email && password) {
       try {
-        console.log(" API");
         const response = await fetch(
           "http://192.168.18.77:3000/api/attendance/loginOnly",
           {
@@ -47,23 +56,24 @@ const Login = () => {
 
         const data = await response.json();
 
-        console.log("Response data: ", data);
-
         if (response.ok) {
+          // ✅ Save token in AsyncStorage
           await AsyncStorage.setItem("token", data.token);
+
           Toast.show({
             type: "success",
             text1: "Login Successful",
             text2: `You are successfully logged in at ${formattedTime}, ${formattedDate}`,
             position: "top",
           });
+
+          // Redirect to home screen
           router.replace("/(tabs)/home");
         } else {
           Toast.show({
             type: "error",
             text1: "Login Failed",
             text2: data.message || "Invalid email or password",
-
             position: "top",
           });
         }
@@ -71,7 +81,7 @@ const Login = () => {
         Toast.show({
           type: "error",
           text1: "Network Error",
-          text2: `Something went wrong. Please try again later.. ${error}`,
+          text2: `Something went wrong. Please try again later. ${error}`,
           position: "top",
         });
       }
@@ -156,16 +166,16 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "600",
     lineHeight: 32,
-    color: "#111827", // dark gray
+    color: "#111827",
     marginBottom: 8,
   },
   titleBlue: {
-    color: "#3b82f6", // blue
+    color: "#3b82f6",
     fontWeight: "700",
   },
   subtitle: {
     fontSize: 14,
-    color: "#6b7280", // gray
+    color: "#6b7280",
     marginBottom: 20,
   },
   input: {
