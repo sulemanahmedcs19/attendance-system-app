@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "owner": "sulemanahmedcs19",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -30,7 +31,11 @@
     "extra": {
       "eas": {
         "projectId": "d89a571d-8867-4623-8407-e0af0b7def47"
-      }
-    }
+      },
+      "expoConfig": {}
+    },
+    "plugins": [
+      "expo-router"
+    ]
   }
 }

@@ -14,6 +14,28 @@ import Toast from "react-native-toast-message";
 import { router } from "expo-router";
 import ActivitySection from "../../components/activitySection";
 
+// 🔥 TOKEN EXPIRY HANDLER HERE
+const handleTokenExpiry = async (msg) => {
+  if (
+    msg === "jwt expired" ||
+    msg === "Token Expired" ||
+    msg === "Invalid Token" ||
+    msg === "No Token Provided"
+  ) {
+    await AsyncStorage.clear();
+    router.replace("/login");
+
+    Toast.show({
+      type: "error",
+      text1: "Session Expired",
+      text2: "Please login again",
+    });
+
+    return true;
+  }
+  return false;
+};
+
 export default function Attendance() {
   const [today] = useState(new Date());
   const [checkedIn, setCheckedIn] = useState(null);
@@ -24,36 +46,29 @@ export default function Attendance() {
   useEffect(() => {
     const loadState = async () => {
       const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        router.replace("/login");
-        return;
-      }
+      if (!token) return router.replace("/login");
 
       const savedCheckedIn = await AsyncStorage.getItem("checkedIn");
       const savedCheckInTime = await AsyncStorage.getItem("checkInTime");
       const savedCheckOutTime = await AsyncStorage.getItem("checkOutTime");
 
       setCheckedIn(savedCheckedIn === "true");
-      setCheckInTime(savedCheckInTime || null);
-      setCheckOutTime(savedCheckOutTime || null);
+      setCheckInTime(savedCheckInTime);
+      setCheckOutTime(savedCheckOutTime);
     };
     loadState();
   }, []);
 
   const handleSwipe = async () => {
     setLoading(true);
-    const now = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
 
     try {
       const token = await AsyncStorage.getItem("token");
-      if (!token) throw new Error("Token not found, please log in again.");
+      if (!token) return router.replace("/login");
 
+      // ------------------ CHECK IN ------------------
       if (!checkedIn) {
-        // Check-In
-        const response = await fetch(
+        const res = await fetch(
           "http://192.168.18.77:3000/api/attendance/checkIn",
           {
             method: "POST",
@@ -63,29 +78,29 @@ export default function Attendance() {
             },
           }
         );
-        const data = await response.json();
-        if (response.ok) {
+
+        const data = await res.json();
+
+        if (await handleTokenExpiry(data.message)) return;
+
+        if (res.ok) {
+          const time = data.attendance.CheckIn.split("T")[1].substr(0, 5);
           setCheckedIn(true);
-          setCheckInTime(data.attendance.CheckIn.split("T")[1].substr(0, 5));
-          setCheckOutTime(null);
+          setCheckInTime(time);
+
           await AsyncStorage.setItem("checkedIn", "true");
-          await AsyncStorage.setItem(
-            "checkInTime",
-            data.attendance.CheckIn.split("T")[1].substr(0, 5)
-          );
+          await AsyncStorage.setItem("checkInTime", time);
           await AsyncStorage.removeItem("checkOutTime");
 
-          Toast.show({ type: "success", text1: `Checked in at ${now}` });
+          Toast.show({ type: "success", text1: `Checked in at ${time}` });
         } else {
-          Toast.show({
-            type: "error",
-            text1: "Problem with Check-In",
-            text2: data.message,
-          });
+          Toast.show({ type: "error", text1: data.message });
         }
-      } else {
-        // Check-Out
-        const response = await fetch(
+      }
+
+      // ------------------ CHECK OUT ------------------
+      else {
+        const res = await fetch(
           "http://192.168.18.77:3000/api/attendance/checkOut",
           {
             method: "POST",
@@ -95,10 +110,12 @@ export default function Attendance() {
             },
           }
         );
-        const data = await response.json();
-        if (response.ok) {
-          setCheckedIn(false);
-          setCheckOutTime(data.checkOutTime);
+
+        const data = await res.json();
+
+        if (await handleTokenExpiry(data.message)) return;
+
+        if (res.ok) {
           await AsyncStorage.clear();
           Toast.show({
             type: "success",
@@ -106,19 +123,11 @@ export default function Attendance() {
           });
           router.replace("/login");
         } else {
-          Toast.show({
-            type: "error",
-            text1: "Problem with Check-Out",
-            text2: data.message,
-          });
+          Toast.show({ type: "error", text1: data.message });
         }
       }
-    } catch (err) {
-      Toast.show({
-        type: "error",
-        text1: "Something went wrong",
-        text2: err.message,
-      });
+    } catch (e) {
+      Toast.show({ type: "error", text1: e.message });
     }
 
     setLoading(false);
@@ -127,10 +136,12 @@ export default function Attendance() {
   if (checkedIn === null) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>Loading attendance...</Text>
+        <Text>Loading Attendance...</Text>
       </View>
     );
   }
+
+  // UI BELOW IS SAME – untouched
 
   const dates = Array.from({ length: 7 }, (_, i) => {
     let d = new Date();
