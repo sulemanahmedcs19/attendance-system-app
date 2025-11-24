@@ -14,7 +14,18 @@ import Toast from "react-native-toast-message";
 import { router } from "expo-router";
 import ActivitySection from "../../components/activitySection";
 
-// 🔥 TOKEN EXPIRY HANDLER HERE
+// 🔹 Helper: Convert ISO string to local 12-hour format
+const formatTime12Hour = (isoTime) => {
+  if (!isoTime) return "--:--";
+  const date = new Date(isoTime);
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+// 🔥 TOKEN EXPIRY HANDLER
 const handleTokenExpiry = async (msg) => {
   if (
     msg === "jwt expired" ||
@@ -69,7 +80,7 @@ export default function Attendance() {
       // ------------------ CHECK IN ------------------
       if (!checkedIn) {
         const res = await fetch(
-          "http://192.168.18.77:3000/api/attendance/checkIn",
+          "https://attendance-system-backend-n5c2.onrender.com/api/attendance/checkIn",
           {
             method: "POST",
             headers: {
@@ -84,15 +95,15 @@ export default function Attendance() {
         if (await handleTokenExpiry(data.message)) return;
 
         if (res.ok) {
-          const time = data.attendance.CheckIn.split("T")[1].substr(0, 5);
+          const time12 = formatTime12Hour(data.attendance.CheckIn);
           setCheckedIn(true);
-          setCheckInTime(time);
+          setCheckInTime(time12);
 
           await AsyncStorage.setItem("checkedIn", "true");
-          await AsyncStorage.setItem("checkInTime", time);
+          await AsyncStorage.setItem("checkInTime", time12);
           await AsyncStorage.removeItem("checkOutTime");
 
-          Toast.show({ type: "success", text1: `Checked in at ${time}` });
+          Toast.show({ type: "success", text1: `Checked in at ${time12}` });
         } else {
           Toast.show({ type: "error", text1: data.message });
         }
@@ -101,7 +112,7 @@ export default function Attendance() {
       // ------------------ CHECK OUT ------------------
       else {
         const res = await fetch(
-          "http://192.168.18.77:3000/api/attendance/checkOut",
+          "https://attendance-system-backend-n5c2.onrender.com/api/attendance/checkOut",
           {
             method: "POST",
             headers: {
@@ -116,10 +127,13 @@ export default function Attendance() {
         if (await handleTokenExpiry(data.message)) return;
 
         if (res.ok) {
+          const time12 = formatTime12Hour(data.checkOutTime);
+          setCheckOutTime(time12);
+
           await AsyncStorage.clear();
           Toast.show({
             type: "success",
-            text1: `Checked out at ${data.checkOutTime}`,
+            text1: `Checked out at ${time12}`,
           });
           router.replace("/login");
         } else {
@@ -133,6 +147,22 @@ export default function Attendance() {
     setLoading(false);
   };
 
+  const isOnTime = (time) => {
+    if (!time) return "--";
+
+    let [hours, minutes] = time.split(":");
+    let h = parseInt(hours);
+    let m = parseInt(minutes);
+
+    // Convert 12-hour string back to 24-hour for comparison
+    if (time.toLowerCase().includes("pm") && h !== 12) h += 12;
+    if (time.toLowerCase().includes("am") && h === 12) h = 0;
+
+    if (h === 20 && m <= 15) return "On Time"; // 8:00 PM - 8:15 PM
+    if ((h >= 20 && h <= 23) || (h >= 0 && h < 5)) return "Late"; // 8:16 PM - 4:59 AM
+    return "Check-in not allowed";
+  };
+
   if (checkedIn === null) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -141,8 +171,7 @@ export default function Attendance() {
     );
   }
 
-  // UI BELOW IS SAME – untouched
-
+  // Prepare last 7 days
   const dates = Array.from({ length: 7 }, (_, i) => {
     let d = new Date();
     d.setDate(today.getDate() + (i - 3));
@@ -190,7 +219,7 @@ export default function Attendance() {
             <Text style={styles.cardNameSpace}>Check In</Text>
           </View>
           <Text style={styles.cardTime}>{checkInTime || "--:--"}</Text>
-          <Text style={styles.cardRemark}>On time</Text>
+          <Text style={styles.cardRemark}>{isOnTime(checkInTime)}</Text>
         </View>
         <View style={styles.card}>
           <View style={styles.cardName}>
@@ -232,7 +261,6 @@ export default function Attendance() {
         />
       </View>
 
-      {/* Added space below swipe button */}
       <View style={styles.spacing} />
     </ScrollView>
   );
@@ -292,5 +320,5 @@ const styles = StyleSheet.create({
   cardTime: { fontSize: 20, fontWeight: "bold", marginVertical: 8 },
   cardRemark: { fontSize: 14, color: "#6b7280" },
   swipeButton: { marginTop: 20 },
-  spacing: { marginBottom: 30 }, // Added space below the swipe button
+  spacing: { marginBottom: 30 },
 });

@@ -29,13 +29,15 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "d89a571d-8867-4623-8407-e0af0b7def47"
-      },
-      "expoConfig": {}
+        "projectId": "e4fbef2d-5fc2-48d3-9ced-630aeaffc7bf"
+      }
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-font",
+      "expo-asset"
     ]
   }
 }
