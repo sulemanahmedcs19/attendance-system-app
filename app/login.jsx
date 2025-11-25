@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useState, useEffect } from "react";
+import * as Network from "expo-network";
 import {
   ScrollView,
   View,
@@ -13,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";
 import { router } from "expo-router";
 
-// 🔥 TOKEN EXPIRY HANDLER HERE
+// 🔥 TOKEN EXPIRY HANDLER
 const handleTokenExpiry = async (msg) => {
   if (
     msg === "jwt expired" ||
@@ -35,6 +36,25 @@ const handleTokenExpiry = async (msg) => {
   return false;
 };
 
+// 🔹 Device Gateway Calculation
+const getGatewayIp = async () => {
+  try {
+    const deviceIp = await Network.getIpAddressAsync(); // device IP
+    console.log("Device IP:", deviceIp);
+
+    const parts = deviceIp.split(".");
+    if (parts.length === 4) {
+      const gatewayIp = `${parts[0]}.${parts[1]}.${parts[2]}.1`; // last octet .1
+      console.log("Calculated Gateway IP:", gatewayIp);
+      return gatewayIp;
+    }
+    return null;
+  } catch (err) {
+    console.log("Failed to get IP:", err);
+    return null;
+  }
+};
+
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,7 +68,6 @@ const Login = () => {
       try {
         const res = await fetch(
           "https://attendance-system-backend-n5c2.onrender.com/api/attendance/checkToken",
-
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -71,14 +90,19 @@ const Login = () => {
       return;
     }
 
+    const gatewayIp = await getGatewayIp();
+    if (!gatewayIp) {
+      Toast.show({ type: "error", text1: "Failed to detect network gateway" });
+      return;
+    }
+
     try {
       const res = await fetch(
         "https://attendance-system-backend-n5c2.onrender.com/api/attendance/loginOnly",
-
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, empPassword: password }),
+          body: JSON.stringify({ email, empPassword: password, ip: gatewayIp }),
         }
       );
 
@@ -92,6 +116,7 @@ const Login = () => {
         Toast.show({ type: "error", text1: data.message });
       }
     } catch (e) {
+      console.log(e);
       Toast.show({ type: "error", text1: "Network Error" });
     }
   };
