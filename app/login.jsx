@@ -124,14 +124,11 @@ const Login = () => {
   return (
     <View style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Image
-          source={require("../assets/crystal-cube.png")}
-          style={styles.logo}
-        />
+        <Image source={require("../assets/roots.jpeg")} style={styles.logo} />
 
         <Text style={styles.title}>
           Welcome Back to{"\n"}
-          <Text style={styles.titleBlue}>HR Attendee</Text>
+          <Text style={styles.titleBlue}>The Roots Digitals</Text>
         </Text>
 
         <Text style={styles.subtitle}>

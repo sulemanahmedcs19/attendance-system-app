@@ -22,8 +22,8 @@ export default function TabsLayout() {
             iconName = "person-outline";
           } else if (route.name === "home") {
             iconName = "home-outline";
-          } else if (route.name === "settings") {
-            iconName = "settings-outline";
+          } else if (route.name === "logout") {
+            iconName = "logout";
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -32,7 +32,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="home" options={{ title: "Home" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
-      <Tabs.Screen name="settings" options={{ title: "Settings" }} />
+      <Tabs.Screen name="logout" options={{ title: "LogOut" }} />
     </Tabs>
   );
 }
