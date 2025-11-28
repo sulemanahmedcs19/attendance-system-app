@@ -23,7 +23,7 @@ export default function TabsLayout() {
           } else if (route.name === "home") {
             iconName = "home-outline";
           } else if (route.name === "logout") {
-            iconName = "logout";
+            iconName = "logout-logo";
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;

@@ -128,7 +128,7 @@ const Login = () => {
 
         <Text style={styles.title}>
           Welcome Back to{"\n"}
-          <Text style={styles.titleBlue}>The Roots Digitals</Text>
+          <Text style={styles.titleBlue}>Team Application</Text>
         </Text>
 
         <Text style={styles.subtitle}>
