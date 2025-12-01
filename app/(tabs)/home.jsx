@@ -14,20 +14,18 @@ import Toast from "react-native-toast-message";
 import { router } from "expo-router";
 import ActivitySection from "../../components/activitySection";
 
+// Karachi time formatting
 const formatTo12Hour = (isoTime) => {
   if (!isoTime) return "--:--";
-
   let timePart = isoTime.split("T")[1].split(".")[0];
   let [hour, minute] = timePart.split(":");
-
   hour = parseInt(hour);
   const ampm = hour >= 12 ? "PM" : "AM";
   hour = hour % 12 || 12;
-
   return `${hour}:${minute} ${ampm}`;
 };
 
-//TOKEN EXPIRY
+// TOKEN EXPIRY
 const handleTokenExpiry = async (msg) => {
   if (
     msg === "jwt expired" ||
@@ -55,6 +53,8 @@ export default function Attendance() {
   const [checkInTime, setCheckInTime] = useState(null);
   const [checkOutTime, setCheckOutTime] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [employeeName, setEmployeeName] = useState("");
+  const [employeeTitle, setEmployeeTitle] = useState("");
 
   useEffect(() => {
     const loadState = async () => {
@@ -64,23 +64,79 @@ export default function Attendance() {
       const savedCheckedIn = await AsyncStorage.getItem("checkedIn");
       const savedCheckInTime = await AsyncStorage.getItem("checkInTime");
       const savedCheckOutTime = await AsyncStorage.getItem("checkOutTime");
+      const savedEmployeeName = await AsyncStorage.getItem("employeeName");
+
+      setEmployeeName(savedEmployeeName || "");
 
       setCheckedIn(savedCheckedIn === "true");
       setCheckInTime(savedCheckInTime);
       setCheckOutTime(savedCheckOutTime);
+
+      // Auto Check Out Logic
+      if (savedCheckedIn === "true" && !savedCheckOutTime) {
+        const now = new Date();
+        const karachiTime = new Date(
+          now.toLocaleString("en-US", { timeZone: "Asia/Karachi" })
+        );
+        const eightAM = new Date(karachiTime);
+        eightAM.setHours(8, 0, 0, 0);
+
+        if (karachiTime >= eightAM) {
+          await autoCheckOut();
+        }
+      }
     };
     loadState();
   }, []);
 
+  const autoCheckOut = async () => {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const res = await fetch(
+        "https://attendance-system-backend-n5c2.onrender.com/api/attendance/checkOut",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await res.json();
+      if (await handleTokenExpiry(data.message)) return;
+
+      if (res.ok) {
+        await AsyncStorage.removeItem("checkedIn");
+        await AsyncStorage.removeItem("checkInTime");
+        await AsyncStorage.removeItem("checkOutTime");
+
+        setCheckedIn(false);
+        setCheckInTime(null);
+        setCheckOutTime(formatTo12Hour(data.checkOutTime));
+
+        Toast.show({
+          type: "success",
+          text1: `Automatically checked out at ${formatTo12Hour(
+            data.checkOutTime
+          )}`,
+        });
+      }
+    } catch (e) {
+      console.log("Auto Check Out Error:", e);
+    }
+  };
+
   const handleSwipe = async () => {
     setLoading(true);
-
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) return router.replace("/login");
 
-      //CHECK IN
       if (!checkedIn) {
+        // CHECK IN
         const res = await fetch(
           "https://attendance-system-backend-n5c2.onrender.com/api/attendance/checkIn",
           {
@@ -93,14 +149,12 @@ export default function Attendance() {
         );
 
         const data = await res.json();
-
         if (await handleTokenExpiry(data.message)) return;
 
         if (res.ok) {
           const time = formatTo12Hour(data.attendance.CheckIn);
           setCheckedIn(true);
           setCheckInTime(time);
-
           await AsyncStorage.setItem("checkedIn", "true");
           await AsyncStorage.setItem("checkInTime", time);
           await AsyncStorage.removeItem("checkOutTime");
@@ -109,40 +163,13 @@ export default function Attendance() {
         } else {
           Toast.show({ type: "error", text1: data.message });
         }
-      }
-
-      //CHECK OUT
-      else {
-        const res = await fetch(
-          "https://attendance-system-backend-n5c2.onrender.com/api/attendance/checkOut",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        const data = await res.json();
-
-        if (await handleTokenExpiry(data.message)) return;
-
-        if (res.ok) {
-          await AsyncStorage.clear();
-          Toast.show({
-            type: "success",
-            text1: `Checked out at ${data.checkOutTime}`,
-          });
-          // router.replace("/login");
-        } else {
-          Toast.show({ type: "error", text1: data.message });
-        }
+      } else {
+        // CHECK OUT
+        await autoCheckOut();
       }
     } catch (e) {
       Toast.show({ type: "error", text1: e.message });
     }
-
     setLoading(false);
   };
 
@@ -168,8 +195,8 @@ export default function Attendance() {
           style={styles.avatar}
         />
         <View>
-          <Text style={styles.name}>Welcome Back</Text>
-          <Text style={styles.designation}>Software Engineer</Text>
+          <Text style={styles.name}>{employeeName}</Text>
+          <Text style={styles.designation}>{employeeTitle}</Text>
         </View>
       </View>
 
@@ -243,7 +270,6 @@ export default function Attendance() {
         />
       </View>
 
-      {/* Added space below swipe button */}
       <View style={styles.spacing} />
     </ScrollView>
   );
@@ -303,5 +329,5 @@ const styles = StyleSheet.create({
   cardTime: { fontSize: 20, fontWeight: "bold", marginVertical: 8 },
   cardRemark: { fontSize: 14, color: "#6b7280" },
   swipeButton: { marginTop: 20 },
-  spacing: { marginBottom: 30 }, // Added space below the swipe button
+  spacing: { marginBottom: 30 },
 });

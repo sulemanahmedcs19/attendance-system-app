@@ -14,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";
 import { router } from "expo-router";
 
-//Token expiry
+// Token expiry handler
 const handleTokenExpiry = async (msg) => {
   if (
     msg === "jwt expired" ||
@@ -36,16 +36,13 @@ const handleTokenExpiry = async (msg) => {
   return false;
 };
 
-//Device Gateway Ip
+// Device Gateway IP
 const getGatewayIp = async () => {
   try {
-    const deviceIp = await Network.getIpAddressAsync(); // device IP
-
+    const deviceIp = await Network.getIpAddressAsync();
     const parts = deviceIp.split(".");
     if (parts.length === 4) {
-      const gatewayIp = `${parts[0]}.${parts[1]}.${parts[2]}.1`;
-
-      return gatewayIp;
+      return `${parts[0]}.${parts[1]}.${parts[2]}.1`;
     }
     return null;
   } catch (err) {
@@ -59,24 +56,37 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
 
+  // Check token on app start
   useEffect(() => {
     const checkToken = async () => {
       const token = await AsyncStorage.getItem("token");
-      if (!token) return;
+      const emailStored = await AsyncStorage.getItem("email");
+      if (!token || !emailStored) return;
 
       try {
         const res = await fetch(
-          "https://attendance-system-backend-n5c2.onrender.com/api/attendance/checkToken",
-          { headers: { Authorization: `Bearer ${token}` } }
+          "https://attendance-system-backend-n5c2.onrender.com/api/attendance/checkActiveToken",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: emailStored }),
+          }
         );
 
         const data = await res.json();
 
-        if (await handleTokenExpiry(data.message)) return;
+        if (!res.ok || !(data.active || data.token)) {
+          await handleTokenExpiry(data.message || "Token Expired");
+          return;
+        }
 
-        if (res.ok) router.replace("/(tabs)/home");
-      } catch {
+        await AsyncStorage.setItem("token", data.token);
+        await AsyncStorage.setItem("employeeName", data.employee.FName);
+        await AsyncStorage.setItem("employeeTitle", data.employee.Title);
+        router.replace("/(tabs)/home");
+      } catch (err) {
         await AsyncStorage.removeItem("token");
+        console.log("Token check failed:", err);
       }
     };
 
@@ -108,8 +118,10 @@ const Login = () => {
       const data = await res.json();
 
       if (res.ok) {
-        await AsyncStorage.setItem("token", data.token);
+        await AsyncStorage.setItem("token", data.token || "");
         await AsyncStorage.setItem("employeeName", data.employee.FName);
+        await AsyncStorage.setItem("email", email);
+
         Toast.show({ type: "success", text1: "Login Successful" });
         router.replace("/(tabs)/home");
       } else {
