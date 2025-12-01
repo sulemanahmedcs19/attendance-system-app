@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import SwipeButton from "rn-swipe-button";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
@@ -9,7 +10,6 @@ import {
   Image,
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import SwipeButton from "rn-swipe-button";
 import Toast from "react-native-toast-message";
 import { router } from "expo-router";
 import ActivitySection from "../../components/activitySection";
