@@ -4,24 +4,38 @@ on:
   push:
     branches:
       - main # Trigger workflow on pushes to main branch
+  pull_request:
+    branches:
+      - main # Optional: also run on PRs to main
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
+      # Step 1: Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Step 2: Set up Java JDK 17
+      # Step 2: Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20" # Replace with the Node version your project uses
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: npm install
+        working-directory: ./ # Root of the repo
+
+      # Step 4: Set up JDK 17
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 17
 
-      # Step 3: Cache Gradle dependencies for faster builds
+      # Step 5: Cache Gradle dependencies
       - name: Cache Gradle packages
         uses: actions/cache@v3
         with:
@@ -32,12 +46,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle
 
-      # Step 4: Build APK
+      # Step 6: Build APK
       - name: Build Release APK
         working-directory: android
         run: ./gradlew assembleRelease
 
-      # Step 5: Upload the built APK as artifact
+      # Step 7: Upload the APK artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
