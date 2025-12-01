@@ -134,7 +134,7 @@ export default function Attendance() {
             type: "success",
             text1: `Checked out at ${data.checkOutTime}`,
           });
-          router.replace("/login");
+          // router.replace("/login");
         } else {
           Toast.show({ type: "error", text1: data.message });
         }

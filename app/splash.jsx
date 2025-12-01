@@ -25,7 +25,7 @@ const Splash = () => {
         animation="rotate"
         duration={2000}
         iterationCount={2}
-        source={require("../assets/crystal-cube.png")}
+        source={require("../assets/roots.jpeg")}
         style={styles.logo}
       />
     </LinearGradient>
