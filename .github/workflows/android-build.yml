@@ -9,19 +9,18 @@ on:
       - main
 
 env:
-  # Keystore and signing credentials from GitHub Secrets
+  NODE_VERSION: "20"
   KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
   KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
   KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
   KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-  NODE_VERSION: "20"
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repo
+      # Step 1: Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -36,6 +35,11 @@ jobs:
         run: npm install
         working-directory: ./
 
+      # Step 3b: Update react-native-screens to fix deprecated 'Shared' issue
+      - name: Update react-native-screens
+        run: npm install react-native-screens@latest
+        working-directory: ./
+
       # Step 4: Set up JDK 17
       - name: Set up JDK
         uses: actions/setup-java@v3
@@ -43,7 +47,7 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # Step 5: Decode keystore from base64 secret
+      # Step 5: Decode keystore
       - name: Decode keystore
         run: |
           mkdir -p android/app
@@ -57,7 +61,7 @@ jobs:
       # Step 7: Build signed release APK
       - name: Build Release APK
         working-directory: android
-        run: ./gradlew assembleRelease -x lint
+        run: ./gradlew assembleRelease -x lint -Pandroid.deprecationAsError=false
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
