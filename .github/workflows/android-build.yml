@@ -8,12 +8,20 @@ on:
     branches:
       - main
 
+env:
+  # Keystore and signing credentials from GitHub Secrets
+  KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+  KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+  KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+  KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+  NODE_VERSION: "20"
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout repository
+      # Step 1: Checkout the repo
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -21,12 +29,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: "20" # replace with your project Node version
+          node-version: ${{ env.NODE_VERSION }}
 
-      # Step 3: Install dependencies
+      # Step 3: Install npm dependencies
       - name: Install dependencies
         run: npm install
-        working-directory: ./ # root of repo
+        working-directory: ./
 
       # Step 4: Set up JDK 17
       - name: Set up JDK
@@ -35,34 +43,28 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # Step 5: Cache Gradle dependencies
-      - name: Cache Gradle packages
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper/
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle
+      # Step 5: Decode keystore from base64 secret
+      - name: Decode keystore
+        run: |
+          mkdir -p android/app
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/my-release-key.keystore
 
-      # Step 6: Set Node environment for Gradle scripts
-      - name: Set Node environment variable
-        run: echo "NODE_BINARY=$(which node)" >> $GITHUB_ENV
-
-      # Step 7: Clean Gradle build
+      # Step 6: Clean previous Gradle builds
       - name: Clean Gradle
         working-directory: android
         run: ./gradlew clean
 
-      # Step 8: Build Release APK
+      # Step 7: Build signed release APK
       - name: Build Release APK
         working-directory: android
-        run: ./gradlew assembleRelease -x lint -Pandroid.injected.cmake.build-type=Release
+        run: ./gradlew assembleRelease -x lint
         env:
-          CXXFLAGS: "-Wno-deprecated-declarations" # ignore deprecated warnings in C++ modules
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          NODE_BINARY: $(which node)
 
-      # Step 9: Upload the APK artifact
+      # Step 8: Upload signed APK artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
