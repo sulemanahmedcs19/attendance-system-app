@@ -34,7 +34,8 @@ jobs:
 
       # Step 4: Build APK
       - name: Build Release APK
-        run: ./android/gradlew assembleRelease
+        working-directory: android
+        run: ./gradlew assembleRelease
 
       # Step 5: Upload the built APK as artifact
       - name: Upload APK
