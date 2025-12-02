@@ -14,48 +14,35 @@ import Toast from "react-native-toast-message";
 import { router } from "expo-router";
 import ActivitySection from "../../components/activitySection";
 
-// Karachi time formatting
-const formatTo12Hour = (isoTime) => {
-  if (!isoTime) return "--:--";
-  let timePart = isoTime.split("T")[1].split(".")[0];
-  let [hour, minute] = timePart.split(":");
-  hour = parseInt(hour);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  hour = hour % 12 || 12;
-  return `${hour}:${minute} ${ampm}`;
-};
-
-// TOKEN EXPIRY
-const handleTokenExpiry = async (msg) => {
-  if (
-    msg === "jwt expired" ||
-    msg === "Token Expired" ||
-    msg === "Invalid Token" ||
-    msg === "No Token Provided"
-  ) {
-    await AsyncStorage.clear();
-    router.replace("/login");
-
-    Toast.show({
-      type: "error",
-      text1: "Session Expired",
-      text2: "Please login again",
-    });
-
-    return true;
-  }
-  return false;
-};
-
 export default function Attendance() {
-  const [today] = useState(new Date());
+  const [employeeName, setEmployeeName] = useState("");
+  const [employeeTitle, setEmployeeTitle] = useState("");
   const [checkedIn, setCheckedIn] = useState(null);
   const [checkInTime, setCheckInTime] = useState(null);
   const [checkOutTime, setCheckOutTime] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [employeeName, setEmployeeName] = useState("");
-  const [employeeTitle, setEmployeeTitle] = useState("");
+  const [swiped, setSwiped] = useState(false); // Track if swipe has been completed
+  const [today] = useState(new Date());
+  const [resetSwipe, setResetSwipe] = useState(false); // Control swipe reset manually
 
+  // Fetch employee details
+  useEffect(() => {
+    const loadEmployeeName = async () => {
+      const name = await AsyncStorage.getItem("employeeName");
+      setEmployeeName(name || "Employee");
+    };
+    loadEmployeeName();
+  }, []);
+
+  useEffect(() => {
+    const loadEmployeeTitle = async () => {
+      const title = await AsyncStorage.getItem("employeeTitle");
+      setEmployeeTitle(title || "Designation");
+    };
+    loadEmployeeTitle();
+  }, []);
+
+  // Fetch check-in/check-out status
   useEffect(() => {
     const loadState = async () => {
       const token = await AsyncStorage.getItem("token");
@@ -64,79 +51,60 @@ export default function Attendance() {
       const savedCheckedIn = await AsyncStorage.getItem("checkedIn");
       const savedCheckInTime = await AsyncStorage.getItem("checkInTime");
       const savedCheckOutTime = await AsyncStorage.getItem("checkOutTime");
-      const savedEmployeeName = await AsyncStorage.getItem("employeeName");
-
-      setEmployeeName(savedEmployeeName || "");
 
       setCheckedIn(savedCheckedIn === "true");
       setCheckInTime(savedCheckInTime);
       setCheckOutTime(savedCheckOutTime);
-
-      // Auto Check Out Logic
-      if (savedCheckedIn === "true" && !savedCheckOutTime) {
-        const now = new Date();
-        const karachiTime = new Date(
-          now.toLocaleString("en-US", { timeZone: "Asia/Karachi" })
-        );
-        const eightAM = new Date(karachiTime);
-        eightAM.setHours(8, 0, 0, 0);
-
-        if (karachiTime >= eightAM) {
-          await autoCheckOut();
-        }
-      }
     };
     loadState();
   }, []);
 
-  const autoCheckOut = async () => {
-    const token = await AsyncStorage.getItem("token");
-    if (!token) return;
+  // Token expiry handler
+  const handleTokenExpiry = async (msg) => {
+    if (
+      msg === "jwt expired" ||
+      msg === "Token Expired" ||
+      msg === "Invalid Token" ||
+      msg === "No Token Provided"
+    ) {
+      await AsyncStorage.clear();
+      router.replace("/login");
 
-    try {
-      const res = await fetch(
-        "https://attendance-system-backend-n5c2.onrender.com/api/attendance/checkOut",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      Toast.show({
+        type: "error",
+        text1: "Session Expired",
+        text2: "Please login again",
+      });
 
-      const data = await res.json();
-      if (await handleTokenExpiry(data.message)) return;
-
-      if (res.ok) {
-        await AsyncStorage.removeItem("checkedIn");
-        await AsyncStorage.removeItem("checkInTime");
-        await AsyncStorage.removeItem("checkOutTime");
-
-        setCheckedIn(false);
-        setCheckInTime(null);
-        setCheckOutTime(formatTo12Hour(data.checkOutTime));
-
-        Toast.show({
-          type: "success",
-          text1: `Automatically checked out at ${formatTo12Hour(
-            data.checkOutTime
-          )}`,
-        });
-      }
-    } catch (e) {
-      console.log("Auto Check Out Error:", e);
+      return true;
     }
+    return false;
   };
 
+  // Format ISO time to 12-hour format
+  const formatTo12Hour = (isoTime) => {
+    if (!isoTime) return "--:--";
+    let timePart = isoTime.split("T")[1].split(".")[0];
+    let [hour, minute] = timePart.split(":");
+
+    hour = parseInt(hour);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    hour = hour % 12 || 12;
+
+    return `${hour}:${minute} ${ampm}`;
+  };
+
+  // Swipe handler
   const handleSwipe = async () => {
     setLoading(true);
+    setSwiped(true); // Mark swipe as completed
+
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) return router.replace("/login");
 
+      // CHECK IN
       if (!checkedIn) {
-        // CHECK IN
         const res = await fetch(
           "https://attendance-system-backend-n5c2.onrender.com/api/attendance/checkIn",
           {
@@ -149,12 +117,14 @@ export default function Attendance() {
         );
 
         const data = await res.json();
+
         if (await handleTokenExpiry(data.message)) return;
 
         if (res.ok) {
           const time = formatTo12Hour(data.attendance.CheckIn);
           setCheckedIn(true);
           setCheckInTime(time);
+
           await AsyncStorage.setItem("checkedIn", "true");
           await AsyncStorage.setItem("checkInTime", time);
           await AsyncStorage.removeItem("checkOutTime");
@@ -163,16 +133,49 @@ export default function Attendance() {
         } else {
           Toast.show({ type: "error", text1: data.message });
         }
-      } else {
-        // CHECK OUT
-        await autoCheckOut();
+      }
+
+      // CHECK OUT
+      else {
+        const res = await fetch(
+          "https://attendance-system-backend-n5c2.onrender.com/api/attendance/checkOut",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await res.json();
+
+        if (await handleTokenExpiry(data.message)) return;
+
+        if (res.ok) {
+          await AsyncStorage.clear();
+          Toast.show({
+            type: "success",
+            text1: `Checked out at ${data.checkOutTime}`,
+          });
+        } else {
+          Toast.show({ type: "error", text1: data.message });
+        }
       }
     } catch (e) {
       Toast.show({ type: "error", text1: e.message });
     }
+
     setLoading(false);
+
+    // Reset swipe button position after a delay
+    setTimeout(() => {
+      setResetSwipe(true);
+      setTimeout(() => setResetSwipe(false), 1000); // Reset swipe after a second
+    }, 1000);
   };
 
+  // Loading state when data is fetching
   if (checkedIn === null) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -181,6 +184,7 @@ export default function Attendance() {
     );
   }
 
+  // Get the last 7 days' dates for the calendar section
   const dates = Array.from({ length: 7 }, (_, i) => {
     let d = new Date();
     d.setDate(today.getDate() + (i - 3));
@@ -267,9 +271,11 @@ export default function Attendance() {
           titleColor="#fff"
           onSwipeSuccess={handleSwipe}
           disabled={loading}
+          reset={resetSwipe} // Reset button position after swipe
         />
       </View>
 
+      {/* Added space below swipe button */}
       <View style={styles.spacing} />
     </ScrollView>
   );

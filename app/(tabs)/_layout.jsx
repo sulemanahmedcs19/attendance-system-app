@@ -19,11 +19,11 @@ export default function TabsLayout() {
           let iconName;
 
           if (route.name === "profile") {
-            iconName = "person-outline";
+            iconName = "person-outline"; // profile icon
           } else if (route.name === "home") {
-            iconName = "home-outline";
+            iconName = "home-outline"; // home icon
           } else if (route.name === "logout") {
-            iconName = "logout-logo";
+            iconName = "log-out"; // correct logout icon
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;

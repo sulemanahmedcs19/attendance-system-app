@@ -7,7 +7,6 @@ export default function Logout() {
   const router = useRouter();
 
   useEffect(() => {
-    // Koi storage clear nahi karna, bas login page pe redirect
     router.replace("/login");
   }, []);
 
